@@ -1,0 +1,52 @@
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="40" cy="40" r="40" fill="#3B82F6"/>
+  
+  <!-- Face -->
+  <circle cx="40" cy="35" r="18" fill="#FEF3C7"/>
+  
+  <!-- Hair -->
+  <path d="M22 28C22 18 30 12 40 12C50 12 58 18 58 28C58 32 56 35 53 37L52 25C52 20 47 16 40 16C33 16 28 20 28 25L27 37C24 35 22 32 22 28Z" fill="#1E40AF"/>
+  
+  <!-- Eyes -->
+  <circle cx="35" cy="32" r="2" fill="#1F2937"/>
+  <circle cx="45" cy="32" r="2" fill="#1F2937"/>
+  <circle cx="35.5" cy="31.5" r="0.8" fill="#FFFFFF"/>
+  <circle cx="45.5" cy="31.5" r="0.8" fill="#FFFFFF"/>
+  
+  <!-- Nose -->
+  <ellipse cx="40" cy="36" rx="1" ry="1.5" fill="#F59E0B"/>
+  
+  <!-- Mouth -->
+  <path d="M37 40C37 41 38.5 42 40 42C41.5 42 43 41 43 40" stroke="#1F2937" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  
+  <!-- Headset -->
+  <!-- Headband -->
+  <path d="M25 30C25 20 31 12 40 12C49 12 55 20 55 30" stroke="#1F2937" stroke-width="3" stroke-linecap="round" fill="none"/>
+  
+  <!-- Left Ear Piece -->
+  <rect x="22" y="28" width="6" height="8" rx="3" fill="#1F2937"/>
+  <rect x="23" y="29" width="4" height="6" rx="2" fill="#374151"/>
+  
+  <!-- Right Ear Piece -->
+  <rect x="52" y="28" width="6" height="8" rx="3" fill="#1F2937"/>
+  <rect x="53" y="29" width="4" height="6" rx="2" fill="#374151"/>
+  
+  <!-- Microphone -->
+  <rect x="46" y="38" width="2" height="8" rx="1" fill="#1F2937"/>
+  <circle cx="47" cy="45" r="2" fill="#374151"/>
+  
+  <!-- Body/Shirt -->
+  <path d="M22 58C22 52 28 48 35 48H45C52 48 58 52 58 58V70C58 75 55 78 50 78H30C25 78 22 75 22 70V58Z" fill="#FFFFFF"/>
+  
+  <!-- Collar -->
+  <path d="M35 48L40 52L45 48" stroke="#E5E7EB" stroke-width="2" fill="none"/>
+  
+  <!-- Chat Bubble -->
+  <circle cx="65" cy="25" r="8" fill="#10B981"/>
+  <path d="M61 25L63 27L69 21" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Notification Dot -->
+  <circle cx="70" cy="15" r="4" fill="#EF4444"/>
+  <text x="70" y="18" text-anchor="middle" fill="#FFFFFF" font-size="6" font-weight="bold">!</text>
+</svg>
