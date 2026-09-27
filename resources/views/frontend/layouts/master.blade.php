@@ -149,11 +149,16 @@
                         <p class="text-xs opacity-90" id="cs-dept">Konsultasi</p>
                     </div>
                 </div>
-                <button id="close-chat" class="text-white hover:text-gray-200">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button id="new-chat-btn" title="Mulai chat baru" class="text-white/70 hover:text-white transition-colors text-xs border border-white/30 rounded px-2 py-1">
+                        + Baru
+                    </button>
+                    <button id="close-chat" class="text-white hover:text-gray-200">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
             
             <!-- Chat Messages -->
@@ -217,6 +222,100 @@
 
         let userData = {};
 
+        // Polling pesan admin
+        let pollingInterval = null;
+        let lastMessageId   = 0;
+
+        // ── RESTORE SESSION DARI LOCALSTORAGE ──
+        (function restoreSession() {
+            try {
+                const saved = localStorage.getItem('virexa_chat_session');
+                if (!saved) return;
+                const session = JSON.parse(saved);
+                // Validasi: harus ada conversationId dan tidak lebih dari 24 jam
+                if (!session.conversationId || !session.savedAt) return;
+                const age = Date.now() - session.savedAt;
+                if (age > 24 * 60 * 60 * 1000) {
+                    localStorage.removeItem('virexa_chat_session');
+                    return;
+                }
+                // Session masih valid — restore langsung ke chat interface
+                userData = session;
+                restoreChatInterface();
+            } catch(e) {
+                localStorage.removeItem('virexa_chat_session');
+            }
+        })();
+
+        function saveSession() {
+            try {
+                localStorage.setItem('virexa_chat_session', JSON.stringify({
+                    ...userData,
+                    savedAt: Date.now(),
+                }));
+            } catch(e) {}
+        }
+
+        function clearSession() {
+            localStorage.removeItem('virexa_chat_session');
+            userData = {};
+        }
+
+        // Restore tampilan chat interface dari session yang tersimpan
+        async function restoreChatInterface() {
+            // Restore lastMessageId dari session supaya polling tidak mulai dari 0
+            if (userData.lastMessageId) lastMessageId = userData.lastMessageId;
+
+            document.getElementById('cs-dept').textContent = userData.department || '';
+            document.getElementById('welcome-msg').textContent = getWelcomeMessage(userData.department, userData.name);
+            const now = nowTime();
+            document.getElementById('welcome-time').textContent = now;
+            document.getElementById('waiting-time').textContent  = now;
+
+            // Load riwayat pesan dari server
+            try {
+                const res    = await fetch(`/api/chat/messages/${userData.conversationId}`);
+                const result = await res.json();
+                if (result.success && result.messages) {
+                    // Kosongkan bubble sambutan dulu, lalu tampilkan riwayat asli
+                    const container = document.getElementById('chat-messages');
+                    container.innerHTML = '<div class="text-center text-xs text-gray-400 mb-3">Riwayat percakapan</div>';
+
+                    result.messages.forEach(msg => {
+                        if (msg.sender_type === 'user') {
+                            const bubble = document.createElement('div');
+                            bubble.className = 'flex justify-end mb-3';
+                            bubble.innerHTML = `
+                                <div class="text-right">
+                                    <div class="bg-blue-500 text-white rounded-lg p-2 shadow-sm text-sm mb-1 max-w-xs break-words">${escapeHtml(msg.message)}</div>
+                                    <div class="text-xs text-gray-400">${new Date(msg.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</div>
+                                </div>`;
+                            container.appendChild(bubble);
+                        } else if (msg.sender_type === 'admin') {
+                            const bubble = document.createElement('div');
+                            bubble.className = 'flex items-start mb-3';
+                            bubble.innerHTML = `
+                                <div class="w-6 h-6 rounded-full overflow-hidden mr-2 flex-shrink-0">
+                                    <img src="{{ asset('images/cs_img.png') }}" alt="CS" class="w-full h-full object-cover">
+                                </div>
+                                <div>
+                                    <div class="bg-white rounded-lg p-2 shadow-sm text-sm mb-1 max-w-xs break-words">${escapeHtml(msg.message)}</div>
+                                    <div class="text-xs text-gray-400">${new Date(msg.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</div>
+                                </div>`;
+                            container.appendChild(bubble);
+                            if (msg.id > lastMessageId) lastMessageId = msg.id;
+                        }
+                    });
+                    container.scrollTop = container.scrollHeight;
+                    // Simpan lastMessageId terbaru ke session
+                    userData.lastMessageId = lastMessageId;
+                    saveSession();
+                }
+            } catch(e) {}
+
+            startPolling();
+        }
+
         // Auto-fill departemen berdasarkan halaman yang sedang dibuka
         (function autoFillDepartment() {
             const path = window.location.pathname;
@@ -248,7 +347,13 @@
 
         // Buka form saat klik avatar
         chatButton.addEventListener('click', () => {
-            if (!chatInterface.classList.contains('hidden')) return; // sudah di chat, tidak perlu buka form
+            // Kalau sudah ada session aktif, langsung buka chat interface
+            if (userData.conversationId) {
+                chatInterface.classList.toggle('hidden');
+                formPopup.classList.add('hidden');
+                return;
+            }
+            if (!chatInterface.classList.contains('hidden')) return;
             formPopup.classList.toggle('hidden');
         });
 
@@ -259,6 +364,37 @@
         closeChat.addEventListener('click', () => {
             chatInterface.classList.add('hidden');
             stopPolling();
+        });
+
+        // Mulai chat baru — hapus session dan tampilkan form lagi
+        document.getElementById('new-chat-btn').addEventListener('click', () => {
+            if (!confirm('Mulai percakapan baru? Riwayat chat ini akan tetap tersimpan di admin kami.')) return;
+            stopPolling();
+            clearSession();
+            chatInterface.classList.add('hidden');
+            // Reset tampilan chat messages ke default
+            document.getElementById('chat-messages').innerHTML = `
+                <div class="text-center text-xs text-gray-400 mb-3">Hari ini</div>
+                <div id="welcome-bubble" class="flex items-start mb-3">
+                    <div class="w-6 h-6 rounded-full overflow-hidden mr-2 flex-shrink-0">
+                        <img src="{{ asset('images/cs_img.png') }}" alt="CS" class="w-full h-full object-cover">
+                    </div>
+                    <div>
+                        <div class="bg-white rounded-lg p-2 shadow-sm text-sm mb-1" id="welcome-msg">Halo! Terima kasih sudah menghubungi VIREXA. 😊</div>
+                        <div class="text-xs text-gray-400" id="welcome-time"></div>
+                    </div>
+                </div>
+                <div class="flex items-start mb-3" id="waiting-bubble">
+                    <div class="w-6 h-6 rounded-full overflow-hidden mr-2 flex-shrink-0">
+                        <img src="{{ asset('images/cs_img.png') }}" alt="CS" class="w-full h-full object-cover">
+                    </div>
+                    <div>
+                        <div class="bg-white rounded-lg p-2 shadow-sm text-sm mb-1">Tim kami akan segera merespons pesanmu. Silakan ketik pertanyaanmu di bawah ya!</div>
+                        <div class="text-xs text-gray-400" id="waiting-time"></div>
+                    </div>
+                </div>`;
+            lastMessageId = 0;
+            formPopup.classList.remove('hidden');
         });
 
         // Trigger buka chat dari tombol CTA eksternal (misal dari modal portfolio)
@@ -314,6 +450,12 @@
 
                 if (result.success) {
                     userData.conversationId = result.data.conversation_id;
+                    // Simpan lastMessageId dari server supaya polling tidak duplikat/skip
+                    lastMessageId = result.data.last_message_id || 0;
+                    userData.lastMessageId = lastMessageId;
+
+                    // Simpan session ke localStorage
+                    saveSession();
 
                     // Update header & pesan sambutan
                     document.getElementById('cs-dept').textContent = userData.department;
@@ -390,10 +532,6 @@
         sendMessageBtn.addEventListener('click', sendChatMessage);
         chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChatMessage(); });
 
-        // Polling pesan admin
-        let pollingInterval = null;
-        let lastMessageId   = 0;
-
         function startPolling() {
             if (pollingInterval) return;
             pollingInterval = setInterval(async () => {
@@ -417,7 +555,11 @@
                             </div>`;
                         chatMessages.appendChild(bubble);
                         chatMessages.scrollTop = chatMessages.scrollHeight;
-                        if (msg.id > lastMessageId) lastMessageId = msg.id;
+                        if (msg.id > lastMessageId) {
+                            lastMessageId = msg.id;
+                            userData.lastMessageId = lastMessageId;
+                            saveSession();
+                        }
                     });
                 } catch (err) {
                     console.error('Polling error:', err);

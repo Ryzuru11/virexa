@@ -46,52 +46,53 @@ class ChatController extends BaseController
     {
         $leadData = $request->validated();
 
-        // Create or find conversation
-        $conversation = Conversation::firstOrCreate(
+        // Selalu update data user jika email sudah ada — fix masalah nama berbeda
+        $conversation = Conversation::updateOrCreate(
             ['user_email' => $leadData['email']],
             [
-                'user_name' => $leadData['name'],
+                'user_name'  => $leadData['name'],
                 'user_phone' => $leadData['phone'],
                 'department' => $leadData['department'],
             ]
         );
 
-        // Save message to database
-        $message = Message::create([
+        // Ambil ID pesan terakhir — untuk polling frontend dimulai dari sini
+        $lastMessage = $conversation->messages()->latest()->first();
+        $lastMessageId = $lastMessage ? $lastMessage->id : 0;
+
+        // Catat lead baru sebagai pesan sistem
+        Message::create([
             'conversation_id' => $conversation->id,
-            'sender_type' => 'user',
-            'message' => "Lead baru dari {$leadData['name']}\nDepartment: {$leadData['department']}\nPhone: {$leadData['phone']}\nEmail: {$leadData['email']}",
+            'sender_type'     => 'user',
+            'message'         => "Percakapan baru dari {$leadData['name']}\nTopik: {$leadData['department']}\nHP: {$leadData['phone']}\nEmail: {$leadData['email']}",
         ]);
 
-        // Send Telegram notification (non-blocking - won't fail user request)
+        // Send Telegram notification (non-blocking)
         $notificationSent = false;
         try {
             $notificationSent = $this->telegramService->sendNewLeadNotification($leadData);
-            
             if (!$notificationSent) {
                 Log::warning('Telegram notification was not sent for lead', [
                     'lead_data' => $leadData,
-                    'reason' => 'Service returned false',
+                    'reason'    => 'Service returned false',
                 ]);
             }
         } catch (\Exception $e) {
-            // Log error but don't fail the request
             Log::error('Exception while sending Telegram notification for lead', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error'     => $e->getMessage(),
                 'lead_data' => $leadData,
             ]);
         }
 
-        // Return success response with user-friendly message
         return response()->json([
             'success' => true,
             'message' => 'Terima kasih! Data Anda telah kami terima. Tim kami akan segera menghubungi Anda.',
-            'data' => [
-                'name' => $leadData['name'],
-                'department' => $leadData['department'],
+            'data'    => [
+                'name'              => $leadData['name'],
+                'department'        => $leadData['department'],
                 'notification_sent' => $notificationSent,
-                'conversation_id' => $conversation->id,
+                'conversation_id'   => $conversation->id,
+                'last_message_id'   => $lastMessageId,
             ],
         ], 200);
     }
